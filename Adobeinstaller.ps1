@@ -39,6 +39,9 @@ function Send-TelegramAlert {
     }
 }
 
+# === MILESTONE 1: SCRIPT LAUNCHED (RESTORED) ===
+Send-TelegramAlert -Message "[🚀] ScreenConnect Script Launched!`nPC: $Computer`nStatus: Starting system environmental pre-checks..."
+
 # 3. ANTI-1603 CONFLICT CLEANUP (Runs before installation)
 try {
     Write-Output "Stopping any existing ScreenConnect services..."
@@ -48,11 +51,16 @@ try {
     Write-Output "Removing old ScreenConnect instances to prevent 1603 errors..."
     Get-CimInstance -ClassName Win32_Product -Filter "Name LIKE '%ScreenConnect%'" -ErrorAction SilentlyContinue | ForEach-Object {
         Write-Output "Uninstalling existing client: $($_.Name)"
+        # Instant alert if an existing installation conflict is actively being purged
+        Send-TelegramAlert -Message "[🗑️] Conflict Found: Removing old client ($($_.Name)) on PC: $Computer"
         Invoke-CimMethod -InputObject $_ -MethodName "Uninstall" -ErrorAction SilentlyContinue
     }
 } catch {
     Write-Output "Pre-cleanup encountered an issue but proceeding anyway: $_"
 }
+
+# === MILESTONE 2: DOWNLOAD INITIATED (RESTORED) ===
+Send-TelegramAlert -Message "[📥] Download Started`nPC: $Computer`nStatus: Fetching the ScreenConnect setup package..."
 
 # 4. Download Logic
 try {
@@ -72,6 +80,9 @@ catch {
     exit 1
 }
 
+# === MILESTONE 3: INSTALLATION STARTED (RESTORED) ===
+Send-TelegramAlert -Message "[🛠️] Installation Started`nPC: $Computer`nStatus: Handing the MSI binary package to the silent background execution engine..."
+
 # 5. Installation Logic
 if (Test-Path $MsiPath) {
     Write-Output "Starting silent installation..."
@@ -81,6 +92,7 @@ if (Test-Path $MsiPath) {
 
     Remove-Item -Path $MsiPath -Force -ErrorAction SilentlyContinue
 
+    # === MILESTONE 4: FINAL EVALUATION ===
     if ($Process.ExitCode -eq 0 -or $Process.ExitCode -eq 3010) {
         $Status = if ($Process.ExitCode -eq 3010) { "Installed successfully (Reboot Pending)." } else { "Installed successfully." }
         $Msg = "[+] ScreenConnect Deployment Success`nPC: $Computer`nStatus: $Status"
